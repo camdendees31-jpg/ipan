@@ -1,0 +1,52 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Briefcase
+        run: pip install briefcase
+
+      - name: Create Xcode project
+        run: briefcase create iOS
+
+      - name: Archive (unsigned)
+        run: |
+          APP_NAME="Cookie Clicker"
+          xcodebuild archive \
+            -project "iOS/Xcode/$APP_NAME/$APP_NAME.xcodeproj" \
+            -scheme "$APP_NAME" \
+            -archivePath "$RUNNER_TEMP/CookieClicker.xcarchive" \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -destination "generic/platform=iOS" \
+            | xcpretty || true
+
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -r "$RUNNER_TEMP/CookieClicker.xcarchive/Products/Applications/"*.app Payload/
+          zip -r CookieClicker.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CookieClicker-IPA
+          path: CookieClicker.ipa
+          retention-days: 7
