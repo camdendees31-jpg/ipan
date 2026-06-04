@@ -21,25 +21,26 @@ jobs:
         run: pip install briefcase
 
       - name: Create Xcode project
-        run: briefcase create iOS
-
-      # Dynamically find the .xcodeproj so the name never needs to be hardcoded
-      - name: Locate Xcode project
-        id: locate
         run: |
-          PROJECT=$(find iOS -name "*.xcodeproj" -maxdepth 4 | head -1)
-          SCHEME=$(basename "$PROJECT" .xcodeproj)
-          echo "project=$PROJECT" >> $GITHUB_OUTPUT
-          echo "scheme=$SCHEME"   >> $GITHUB_OUTPUT
-          echo "Found project : $PROJECT"
-          echo "Scheme        : $SCHEME"
+          briefcase create iOS
+          echo "=== xcodeproj locations ==="
+          find . -name "*.xcodeproj" 2>/dev/null || echo "none found"
 
-      # Build (not archive) — output goes to a known directory we control
+      # Locate + build in one step — avoids step-output escaping issues with spaces in names
       - name: Build unsigned
         run: |
+          PROJECT=$(find . -name "*.xcodeproj" | head -1)
+          if [ -z "$PROJECT" ]; then
+            echo "ERROR: no .xcodeproj found after briefcase create"
+            exit 1
+          fi
+          SCHEME=$(basename "$PROJECT" .xcodeproj)
+          echo "Project : $PROJECT"
+          echo "Scheme  : $SCHEME"
+
           xcodebuild build \
-            -project "${{ steps.locate.outputs.project }}" \
-            -scheme  "${{ steps.locate.outputs.scheme }}"  \
+            -project "$PROJECT" \
+            -scheme  "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
             CONFIGURATION_BUILD_DIR="$RUNNER_TEMP/app_build" \
@@ -47,10 +48,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      # Package the .app into a sideloadable .ipa
       - name: Package IPA
         run: |
           APP=$(find "$RUNNER_TEMP/app_build" -name "*.app" -maxdepth 1 | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: no .app found in build output"
+            ls "$RUNNER_TEMP/app_build" || true
+            exit 1
+          fi
           echo "Packaging: $APP"
           mkdir Payload
           cp -r "$APP" Payload/
