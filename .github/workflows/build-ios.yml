@@ -23,24 +23,37 @@ jobs:
       - name: Create Xcode project
         run: briefcase create iOS
 
-      - name: Archive (unsigned)
+      # Dynamically find the .xcodeproj so the name never needs to be hardcoded
+      - name: Locate Xcode project
+        id: locate
         run: |
-          APP_NAME="Cookie Clicker"
-          xcodebuild archive \
-            -project "iOS/Xcode/$APP_NAME/$APP_NAME.xcodeproj" \
-            -scheme "$APP_NAME" \
-            -archivePath "$RUNNER_TEMP/CookieClicker.xcarchive" \
+          PROJECT=$(find iOS -name "*.xcodeproj" -maxdepth 4 | head -1)
+          SCHEME=$(basename "$PROJECT" .xcodeproj)
+          echo "project=$PROJECT" >> $GITHUB_OUTPUT
+          echo "scheme=$SCHEME"   >> $GITHUB_OUTPUT
+          echo "Found project : $PROJECT"
+          echo "Scheme        : $SCHEME"
+
+      # Build (not archive) — output goes to a known directory we control
+      - name: Build unsigned
+        run: |
+          xcodebuild build \
+            -project "${{ steps.locate.outputs.project }}" \
+            -scheme  "${{ steps.locate.outputs.scheme }}"  \
+            -sdk iphoneos \
             -configuration Release \
+            CONFIGURATION_BUILD_DIR="$RUNNER_TEMP/app_build" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            -destination "generic/platform=iOS" \
-            | xcpretty || true
+            CODE_SIGNING_ALLOWED=NO
 
+      # Package the .app into a sideloadable .ipa
       - name: Package IPA
         run: |
+          APP=$(find "$RUNNER_TEMP/app_build" -name "*.app" -maxdepth 1 | head -1)
+          echo "Packaging: $APP"
           mkdir Payload
-          cp -r "$RUNNER_TEMP/CookieClicker.xcarchive/Products/Applications/"*.app Payload/
+          cp -r "$APP" Payload/
           zip -r CookieClicker.ipa Payload
           rm -rf Payload
 
