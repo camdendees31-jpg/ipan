@@ -26,8 +26,11 @@ jobs:
           echo "=== xcodeproj locations ==="
           find . -name "*.xcodeproj" 2>/dev/null || echo "none found"
 
-      # Locate + build in one step — avoids step-output escaping issues with spaces in names
-      - name: Build unsigned
+      # Locate + build in one step — avoids step-output escaping issues with spaces in names.
+      # CODE_SIGN_IDENTITY="-" means ad-hoc signing: no keychain needed, works on CI.
+      # Briefcase's "Process Python libraries" script signs each .framework — it must be "-",
+      # not "" (empty string still hits the keychain and fails).
+      - name: Build (ad-hoc signed)
         run: |
           PROJECT=$(find . -name "*.xcodeproj" | head -1)
           if [ -z "$PROJECT" ]; then
@@ -44,9 +47,10 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             CONFIGURATION_BUILD_DIR="$RUNNER_TEMP/app_build" \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
+            EXPANDED_CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=YES
 
       - name: Package IPA
         run: |
