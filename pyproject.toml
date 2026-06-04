@@ -1,0 +1,18 @@
+[tool.briefcase]
+project_name = "Cookie Clicker"
+bundle = "com.yourname"
+version = "0.0.1"
+author = "Your Name"
+author_email = "you@email.com"
+license = "MIT"
+
+[tool.briefcase.app.cookieclicker]
+formal_name = "Cookie Clicker"
+description = "A Cookie Clicker fan game"
+sources = ["src/cookieclicker"]
+requires = [
+    "toga>=0.4.0",
+]
+
+[tool.briefcase.app.cookieclicker.iOS]
+supported = true
